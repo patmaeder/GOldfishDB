@@ -2,6 +2,7 @@ package main
 
 import (
 	"DBMS/SQL/Parser"
+	"DBMS/TCP/Server"
 )
 
 func main() {
@@ -12,4 +13,6 @@ func main() {
 	if err != nil {
 		print(err.Error())
 	}
+
+	Server.Start()
 }
