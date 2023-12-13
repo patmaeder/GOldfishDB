@@ -104,9 +104,9 @@ func (l *Lexer) scan(ch rune) (Token.Token, error) {
 		return l.scanPunctuation(), nil
 	case isEOF(ch):
 		return Token.Token{Type: Token.EOF}, nil
-	default:
-		return Token.Token{}, errors.New("Unknown character: " + string(ch))
 	}
+
+	return Token.Token{}, errors.New("Unknown character: " + string(ch) + " near position " + string(rune(l.pointer)))
 }
 
 func (l *Lexer) scanWhitespace() Token.Token {
