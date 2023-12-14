@@ -1,11 +1,12 @@
 package Server
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
 )
+
+var callback func(buffer []byte) []byte
 
 func Start() {
 	log.Println("Starting TCP Server...")
@@ -48,14 +49,16 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	fmt.Printf("Received: %s\n", buffer)
-
-	// TODO: Convert buffer to string, create parser
+	response := callback(buffer)
 
 	// TODO: Send data back to the client
-	_, err = conn.Write([]byte("Message received.\n"))
+	_, err = conn.Write([]byte(response))
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
+}
+
+func Handle(cb func(buffer []byte) []byte) {
+	callback = cb
 }
