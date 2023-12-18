@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 )
 
 var callback func(buffer []byte) []byte
@@ -49,10 +50,10 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	response := callback(buffer)
+	log.Printf("Incoming request: %s %q", conn.RemoteAddr().String(), strings.TrimSpace(string(buffer)))
+	res := callback(buffer)
 
-	// TODO: Send data back to the client
-	_, err = conn.Write([]byte(response))
+	_, err = conn.Write([]byte(res))
 	if err != nil {
 		log.Println(err.Error())
 		return
