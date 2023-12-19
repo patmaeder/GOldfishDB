@@ -2,20 +2,43 @@ package fs
 
 import (
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 )
 
 var mtx sync.Mutex
 
-func Create(filePath string) error {
-	file, err := os.Create(filePath)
+func Create(path string) error {
+	containsFilenamePattern := `^(\/?[\w\W]+\/?)+([^/]+\.)(\w+)$`
+	match, _ := regexp.MatchString(containsFilenamePattern, path)
+
+	if match {
+		directoryStructure := path[:strings.LastIndex(path, "/")]
+
+		print(path)
+
+		err := os.MkdirAll(directoryStructure, 0777)
+		if err != nil {
+			return err
+		}
+
+		file, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			_ = file.Close()
+		}()
+
+		return nil
+	}
+
+	err := os.MkdirAll(path, 0777)
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		_ = file.Close()
-	}()
 
 	return nil
 }

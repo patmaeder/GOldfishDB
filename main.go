@@ -2,20 +2,35 @@ package main
 
 import (
 	"DBMS/SQL/Parser"
-	"DBMS/TCP/Server"
+	"DBMS/storage"
 	"fmt"
+	"os"
+
+	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
-	Server.Handle(Compose)
-	Server.Start()
+
+	// Create data directory
+	err := os.MkdirAll(os.Getenv("DATA_DIR"), 0777)
+	if err != nil {
+		panic(err)
+	}
+
+	/*Server.Handle(Compose)
+	Server.Start()*/
+	err = storage.CreateDatabase("test")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 }
 
+// TODO: Rename compose function
 func Compose(buffer []byte) []byte {
 
-	fmt.Printf("Received: %s\n", string(buffer))
 	parser := Parser.New(string(buffer))
-	err := parser.Parse()
+	_, err := parser.Parse()
 	if err != nil {
 		return []byte(err.Error())
 	}
