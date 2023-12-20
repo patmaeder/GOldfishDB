@@ -10,121 +10,96 @@ import (
 var mtx sync.Mutex
 
 func Create(path string) error {
-	containsFilenamePattern := `^(\/?[\w\W]+\/?)+([^/]+\.)(\w+)$`
-	match, _ := regexp.MatchString(containsFilenamePattern, path)
-
-	if match {
-		directoryStructure := path[:strings.LastIndex(path, "/")]
-
-		print(path)
-
-		err := os.MkdirAll(directoryStructure, 0777)
-		if err != nil {
-			return err
-		}
-
-		file, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			_ = file.Close()
-		}()
-
-		return nil
+	if _, err := os.Stat(path); err == nil {
+		return os.ErrExist
 	}
 
-	err := os.MkdirAll(path, 0777)
+	match, _ := regexp.MatchString(`^(\/?[\w\W]+\/?)+([^/]+\.)(\w+)$`, path)
+	if !match {
+		return os.MkdirAll(path, 0777)
+	}
+
+	directoryStructure := path[:strings.LastIndex(path, "/")]
+
+	err := os.MkdirAll(directoryStructure, 0777)
 	if err != nil {
 		return err
 	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
 
 	return nil
 }
 
-func read(filePath string, b []byte, offset int64) error {
-	file, err := os.Open(filePath)
+func read(path string, b []byte, offset int64) error {
+	file, err := os.OpenFile(path, os.O_RDONLY, 0444)
 	if err != nil {
 		return err
 	}
 
-	// TODO: Neat to show (auto close file at end and unlock)
-	defer func() {
-		mtx.Unlock()
-		_ = file.Close()
-	}()
+	defer file.Close()
 
-	mtx.Lock()
 	_, err = file.ReadAt(b, offset)
+	return err
+}
+
+func ReadAll(path string, b []byte) error {
+	fileStat, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return read(path, make([]byte, fileStat.Size()), 0)
 }
 
-func ReadAll(filePath string, b []byte) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-
-	fileStat, err := file.Stat()
-	_ = file.Close()
-	return read(filePath, make([]byte, fileStat.Size()), 0)
+func Read(path string, b []byte) error {
+	return read(path, b, 0)
 }
 
-func Read(filePath string, b []byte) error {
-	return read(filePath, b, 0)
+func ReadAt(path string, b []byte, offset int64) error {
+	return read(path, b, offset)
 }
 
-func ReadAt(filePath string, b []byte, offset int64) error {
-	return read(filePath, b, offset)
-}
-
-func write(filePath string, data []byte, offset int64) error {
-	file, err := os.Open(filePath)
+func write(path string, data []byte, offset int64) error {
+	file, err := os.OpenFile(path, os.O_WRONLY, 0666)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
+		file.Sync()
 		mtx.Unlock()
-		_ = file.Close()
+		file.Close()
 	}()
 
 	mtx.Lock()
 	_, err = file.WriteAt(data, offset)
+	return err
+}
 
+func Write(path string, data []byte) error {
+	fileStat, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 
-	_ = file.Sync()
-	return nil
+	return write(path, data, fileStat.Size())
 }
 
-func Write(filePath string, data []byte) error {
-	file, err := os.Open(filePath)
+func WriteAt(path string, data []byte, offset int64) error {
+	return write(path, data, offset)
+}
+
+func Delete(path string) error {
+	_, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 
-	fileStat, err := file.Stat()
-	_ = file.Close()
-	return write(filePath, data, fileStat.Size())
-}
-
-func WriteAt(filePath string, data []byte, offset int64) error {
-	return write(filePath, data, offset)
-}
-
-func Delete(filePath string) error {
-	err := os.Remove(filePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(path)
 }
