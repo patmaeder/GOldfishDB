@@ -2,6 +2,7 @@ package databaseManager
 
 import (
 	"DBMS/fs"
+	"DBMS/storage"
 	"errors"
 	"os"
 	"regexp"
@@ -11,28 +12,30 @@ import (
 
 var dataDirectory = os.Getenv("DATA_DIR")
 
-func CreateDatabase(dbName string) error {
-	if match, _ := regexp.MatchString(`^[a-zA-Z][a-zA-Z0-9_.-]{1,64}$`, dbName); !match {
+func CreateDatabase(db storage.Database) error {
+	if DoesExist(db) {
+		return errors.New("database already exists")
+	}
+
+	if match, _ := regexp.MatchString(`^[a-zA-Z][a-zA-Z0-9_.-]{1,64}$`, db.Name); !match {
 		return errors.New("invalid database name. Must start with a letter and be between 1 and 64 characters long")
 	}
 
-	if err := fs.Create(dataDirectory + "/" + dbName); err != nil {
-		if os.IsExist(err) {
-			return errors.New("database already exists")
-		}
-		return err
-	}
-
-	return nil
+	return fs.Create(db.GetPath())
 }
 
-func DeleteDatabase(dbName string) error {
-	if err := fs.Delete(dataDirectory + "/" + dbName); err != nil {
-		if os.IsNotExist(err) {
-			return errors.New("database does not exist")
-		}
-		return err
+func DeleteDatabase(db storage.Database) error {
+	if !DoesExist(db) {
+		return errors.New("database does not exist")
 	}
 
-	return nil
+	return fs.Delete(db.GetPath())
+}
+
+func DoesExist(db storage.Database) bool {
+	_, err := os.Stat(db.GetPath())
+	if err != nil {
+		return false
+	}
+	return true
 }

@@ -2,38 +2,56 @@ package tableManager
 
 import (
 	"DBMS/fs"
+	"DBMS/storage"
+	"DBMS/storage/databaseManager"
 	"errors"
 	"os"
 	"regexp"
-
-	_ "github.com/joho/godotenv/autoload"
 )
 
-var dataDirectory = os.Getenv("DATA_DIR")
-
-func CreateTable(dbName string, tableName string) error {
-	if _, err := os.Stat(dataDirectory + "/" + dbName); err != nil {
-		if os.IsNotExist(err) {
-			return errors.New("database does not exist")
-		}
+func CreateTable(table storage.Table) error {
+	if DoesExist(table) {
+		return errors.New("table already exists")
 	}
 
-	if _, err := os.Stat(dataDirectory + "/" + dbName + "/" + tableName + ".frm"); err == nil {
-		return errors.New("table with the given name already exists")
-	}
-
-	validTableNamePattern := `^[a-zA-Z_][a-zA-Z0-9_\-]{1,64}$`
-	if match, _ := regexp.MatchString(validTableNamePattern, tableName); !match {
+	if match, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,64}$`, table.Name); !match {
 		return errors.New("invalid table name. Must start with a letter or an underscore and be between 1 and 64 characters long")
 	}
 
-	if err := fs.Create(dataDirectory + "/" + dbName + "/" + tableName + ".frm"); err != nil {
+	if err := fs.Create(table.GetFrmPath()); err != nil {
 		return err
 	}
-
-	if err := fs.Create(dataDirectory + "/" + dbName + "/" + tableName + ".idb"); err != nil {
+	if err := fs.Create(table.GetIdbPath()); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func DeleteTable(table storage.Table) error {
+	if !DoesExist(table) {
+		return errors.New("table does not exist")
+	}
+
+	if err := fs.Delete(table.GetFrmPath()); err != nil {
+		return err
+	}
+	if err := fs.Delete(table.GetIdbPath()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DoesExist(table storage.Table) bool {
+	if !databaseManager.DoesExist(table.Database) {
+		return false
+	}
+
+	_, err := os.Stat(table.GetFrmPath())
+	if err != nil {
+		return false
+	}
+
+	return true
 }
