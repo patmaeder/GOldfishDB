@@ -2,28 +2,29 @@ package main
 
 import (
 	"DBMS/SQL/Parser"
-	"DBMS/storage"
-	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
 
+	// Sanitize DATA_DIR
+	dataDir := os.Getenv("DATA_DIR")
+	err := os.Setenv("DATA_DIR", strings.TrimRight(dataDir, "/"))
+	if err != nil {
+		panic(err)
+	}
+
 	// Create data directory
-	err := os.MkdirAll(os.Getenv("DATA_DIR"), 0777)
+	err = os.MkdirAll(os.Getenv("DATA_DIR"), 0777)
 	if err != nil {
 		panic(err)
 	}
 
 	/*Server.Handle(Compose)
 	Server.Start()*/
-	err = storage.CreateDatabase("test")
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
 }
 
 // TODO: Rename compose function
