@@ -22,8 +22,8 @@ type Column struct {
 	// TODO: Add support for foreign key
 }
 
-func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, nullable bool) *Column {
-	return &Column{
+func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, nullable bool) Column {
+	return Column{
 		Name:          name,
 		Type:          dataType,
 		Primary:       primary,

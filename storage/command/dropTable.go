@@ -1,40 +1,33 @@
 package command
 
 import (
+	"DBMS/storage"
 	"errors"
 	"os"
 )
 
 type DropTableCommand struct {
-	Name     string
+	Table    storage.Table
 	IfExists bool
 }
 
-func DropTable(name string, ifExists bool) *DropTableCommand {
-	return &DropTableCommand{
-		Name:     name,
+func DropTable(table storage.Table, ifExists bool) DropTableCommand {
+	return DropTableCommand{
+		Table:    table,
 		IfExists: ifExists,
 	}
 }
 
-func (c *DropTableCommand) Execute() error {
-	FrmFilePath := os.Getenv("DATA_DIR") + "/" + c.Name + ".frm"
-	IdbFilePath := os.Getenv("DATA_DIR") + "/" + c.Name + ".idb"
-
-	_, err1 := os.Stat(FrmFilePath)
-	_, err2 := os.Stat(IdbFilePath)
-	if err := errors.Join(err1, err2); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			if c.IfExists {
-				return nil
-			}
-			return errors.New("a table with the provided name does not exists")
+func (c DropTableCommand) Execute() error {
+	if !c.Table.Exists() {
+		if c.IfExists {
+			return nil
 		}
-		return err
+		return errors.New("a table with the provided name does not exists")
 	}
 
-	err1 = os.Remove(FrmFilePath)
-	err2 = os.Remove(IdbFilePath)
+	err1 := os.Remove(c.Table.GetFrmFilePath())
+	err2 := os.Remove(c.Table.GetIdbFilePath())
 	if err := errors.Join(err1, err2); err != nil {
 		return err
 	}

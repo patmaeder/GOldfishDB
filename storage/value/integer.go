@@ -1,6 +1,6 @@
 package value
 
-const IntegerLength = 32
+const IntegerLength = 4
 
 type IntegerValue struct {
 	Value int32

@@ -1,6 +1,6 @@
 package value
 
-const RealLength = 64
+const RealLength = 8
 
 type RealValue struct {
 	Value int64
