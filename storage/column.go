@@ -22,12 +22,13 @@ type Column struct {
 	// TODO: Add support for foreign key
 }
 
-func NewColumn(name string, dataType DataType, primary bool) Column {
-	nameBytes := []byte(name)
-	nameByteArray := append(nameBytes, make([]byte, 128-len(nameBytes))...)
-	return Column{
-		Name:    [128]byte(nameByteArray),
-		Type:    dataType,
-		Primary: primary,
+func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, nullable bool) *Column {
+	return &Column{
+		Name:          name,
+		Type:          dataType,
+		Primary:       primary,
+		Autoincrement: autoincrement,
+		Unique:        unique,
+		Nullable:      nullable,
 	}
 }

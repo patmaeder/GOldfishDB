@@ -6,11 +6,9 @@ type TextValue struct {
 	Value [1024]byte
 }
 
-func Text(value string) TextValue {
-	valueBytes := []byte(value)
-	valueByteArray := append(valueBytes, make([]byte, 1024-len(valueBytes))...)
+func Text(value [1024]byte) TextValue {
 	return TextValue{
-		Value: [1024]byte(valueByteArray),
+		Value: value,
 	}
 }
 
