@@ -2,71 +2,48 @@ package command
 
 import (
 	"DBMS/storage"
+	"DBMS/storage/processors"
 	"DBMS/storage/value"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
-	"slices"
 )
 
 type SelectCommand struct {
 	Table  storage.Table
 	Fields [][128]byte
+	Where  map[[128]byte]value.Constraint
 }
 
-func Select(table storage.Table, fields [][128]byte) SelectCommand {
-	/*convertedFields := make([][128]byte, 0)
-
-	for _, field := range fields {
-		fieldBytes := []byte(field)
-		fieldByteArray := append(fieldBytes, make([]byte, 128-len(fieldBytes))...)
-		convertedFields = append(convertedFields, [128]byte(fieldByteArray))
-	}*/
-
+func Select(table storage.Table, fields [][128]byte, where map[[128]byte]value.Constraint) SelectCommand {
 	return SelectCommand{
 		Table:  table,
 		Fields: fields,
+		Where:  where,
 	}
 }
 
 func (c SelectCommand) Execute() ([]storage.Row, error) {
+	// TODO: Move this to validator
 	if !c.Table.Exists() {
 		return nil, errors.New("a table with the given name does not exist")
 	}
 
-	idbFile, _ := os.Open(c.Table.GetIdbFilePath())
-	idbFileStat, _ := idbFile.Stat()
+	idbFile, _ := os.OpenFile(c.Table.GetIdbFilePath(), os.O_RDONLY, 0444)
 	defer idbFile.Close()
 
-	rowLenght := int64(0)
-	rowCount := int64(0)
-	offsets := make(map[int64]*storage.Column)
+	columnMap := c.Table.ConvertColumnsToMap()
+	queryResult := make([]storage.Row, 0)
+	where := processors.Where(&c.Table, c.Where)
 
-	for _, column := range c.Table.Columns {
-		if slices.Contains(c.Fields, column.Name) {
-			offsets[rowLenght] = column
-		}
-
-		switch column.Type {
-		case storage.INTEGER:
-			rowLenght += value.IntegerLength
-		case storage.REAL:
-			rowLenght += value.RealLength
-		case storage.BOOLEAN:
-			rowLenght += value.BooleanLength
-		case storage.TEXT:
-			rowLenght += value.TextLength
-		}
-	}
-
-	result := make([]storage.Row, 0)
-	for rowCount*rowLenght < idbFileStat.Size() {
-		row := storage.NewRow(make(map[[128]byte]any))
-
-		for offset, column := range offsets {
+	yield := make(chan struct{})
+	for rowId := range where.Process(yield) {
+		row := storage.NewRow(map[[128]byte]value.Value{})
+		for _, field := range c.Fields {
+			column := columnMap[field]
 			bufferSize := int64(0)
-			var mappingValue interface{}
+			var mappingValue value.Value
 
 			switch column.Type {
 			case storage.INTEGER:
@@ -84,7 +61,7 @@ func (c SelectCommand) Execute() ([]storage.Row, error) {
 			}
 
 			buffer := make([]byte, bufferSize)
-			_, err := idbFile.ReadAt(buffer, rowCount*rowLenght+offset)
+			_, err := idbFile.ReadAt(buffer, rowId*c.Table.RowLength+column.Offset)
 			if err != nil {
 				return nil, err
 			}
@@ -97,9 +74,8 @@ func (c SelectCommand) Execute() ([]storage.Row, error) {
 			row.Entries[column.Name] = mappingValue
 		}
 
-		result = append(result, row)
-		rowCount++
+		queryResult = append(queryResult, row)
 	}
 
-	return result, nil
+	return queryResult, nil
 }
