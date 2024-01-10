@@ -9,17 +9,18 @@ const (
 	BOOLEAN
 )
 
-const columnLength = 128 + 1 + 1 + 1 + 1 + 1
+const columnLength = 128 + 1 + 8 + 1 + 1 + 1 + 1
 
 type Column struct {
 	Name          [128]byte
 	Type          DataType
+	Offset        int64
 	Primary       bool
 	Autoincrement bool
 	Unique        bool
 	Nullable      bool
-	//Default       any
-	// TODO: Add support for foreign key
+	//Foreign Key
+	//Default
 }
 
 func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, nullable bool) Column {
