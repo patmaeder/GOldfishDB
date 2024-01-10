@@ -26,7 +26,6 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 	go func() {
 		defer close(ch)
 
-		// TODO: Change all calls to corresponding mode
 		idbFile, _ := os.OpenFile(p.Table.GetIdbFilePath(), os.O_RDONLY, 0444)
 		defer idbFile.Close()
 		idbFileStat, _ := idbFile.Stat()

@@ -70,7 +70,7 @@ func GetTable(tableName string) (Table, error) {
 		return Table{}, errors.New("a table with the given name does not exist")
 	}
 
-	frmFile, _ := os.Open(table.GetFrmFilePath())
+	frmFile, _ := os.OpenFile(table.GetFrmFilePath(), os.O_RDONLY, 0444)
 	defer frmFile.Close()
 	frmFileStat, _ := frmFile.Stat()
 
