@@ -11,12 +11,14 @@ import (
 type WhereProcessor struct {
 	Table       *storage.Table
 	Constraints map[[128]byte]value.Constraint
+	Limit       int
 }
 
-func Where(table *storage.Table, constraints map[[128]byte]value.Constraint) WhereProcessor {
+func Where(table *storage.Table, constraints map[[128]byte]value.Constraint, limit int) WhereProcessor {
 	return WhereProcessor{
 		Table:       table,
 		Constraints: constraints,
+		Limit:       limit,
 	}
 }
 
@@ -32,8 +34,14 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 
 		columnMap := p.Table.ConvertColumnsToMap()
 		rowCount := int64(0)
+		hits := 0
 
 		for rowCount*p.Table.RowLength < idbFileStat.Size() {
+
+			if p.Limit >= 0 && hits >= p.Limit {
+				break
+			}
+
 			rowValid := true
 			for field, constraint := range p.Constraints {
 				var buffer []byte
@@ -72,6 +80,7 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 
 			if rowValid {
 				ch <- rowCount
+				hits++
 			}
 
 			rowCount++
