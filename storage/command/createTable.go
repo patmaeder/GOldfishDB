@@ -13,7 +13,7 @@ type CreateTableCommand struct {
 	IfNotExists bool
 }
 
-func CreateTable(table storage.Table, ifNotExists bool, columns []storage.Column) CreateTableCommand {
+func CreateTable(table storage.Table, ifNotExists bool) CreateTableCommand {
 	return CreateTableCommand{
 		Table:       table,
 		IfNotExists: ifNotExists,
@@ -41,6 +41,11 @@ func (c CreateTableCommand) Execute() error {
 	defer frmFile.Close()
 
 	buffer := new(bytes.Buffer)
+	err := binary.Write(buffer, binary.LittleEndian, c.Table.RowLength)
+	if err != nil {
+		return err
+	}
+
 	for _, column := range c.Table.Columns {
 		err := binary.Write(buffer, binary.LittleEndian, column)
 		if err != nil {
@@ -48,7 +53,7 @@ func (c CreateTableCommand) Execute() error {
 		}
 	}
 
-	_, err := frmFile.Write(buffer.Bytes())
+	_, err = frmFile.Write(buffer.Bytes())
 	if err != nil {
 		return err
 	}
