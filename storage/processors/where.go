@@ -9,17 +9,21 @@ import (
 )
 
 type WhereProcessor struct {
-	Table       *storage.Table
-	Constraints map[[128]byte]value.Constraint
-	Limit       int
+	Table          *storage.Table
+	Constraints    map[[128]byte]value.Constraint
+	limitProcessor LimitProcessor
 }
 
-func Where(table *storage.Table, constraints map[[128]byte]value.Constraint, limit int) WhereProcessor {
+func Where(table *storage.Table, constraints map[[128]byte]value.Constraint) WhereProcessor {
 	return WhereProcessor{
 		Table:       table,
 		Constraints: constraints,
-		Limit:       limit,
 	}
+}
+
+func (p WhereProcessor) Limit(limitProcessor LimitProcessor) *WhereProcessor {
+	p.limitProcessor = limitProcessor
+	return &p
 }
 
 func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
@@ -38,7 +42,7 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 
 		for rowCount*p.Table.RowLength < idbFileStat.Size() {
 
-			if p.Limit >= 0 && hits >= p.Limit {
+			if p.limitProcessor.Limit > 0 && hits >= p.limitProcessor.Limit {
 				break
 			}
 
