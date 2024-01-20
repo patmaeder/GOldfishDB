@@ -1,9 +1,9 @@
 package Token
 
-type TokenType int
+type Type int
 
 const (
-	WS TokenType = iota
+	WS Type = iota
 	STRING
 	NUMBER
 	IDENT
@@ -15,6 +15,6 @@ const (
 )
 
 type Token struct {
-	Type  TokenType
+	Type  Type
 	Value string
 }
