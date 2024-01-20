@@ -36,6 +36,13 @@ func (v BooleanValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v BooleanValue) IsNULL() bool {
+	if v == BooleanNull() {
+		return true
+	}
+	return false
+}
+
 func (v BooleanValue) ToString() string {
 	return strconv.FormatBool(v.Value)
 }

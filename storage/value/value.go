@@ -2,6 +2,7 @@ package value
 
 type Value interface {
 	Passes(constraint Constraint) bool
+	IsNULL() bool
 	ToString() string
 }
 

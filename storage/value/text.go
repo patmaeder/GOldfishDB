@@ -34,6 +34,13 @@ func (v TextValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v TextValue) IsNULL() bool {
+	if v == TextNull() {
+		return true
+	}
+	return false
+}
+
 func (v TextValue) ToString() string {
-	return string(v.Value[:])
+	return "'" + string(v.Value[:]) + "'"
 }

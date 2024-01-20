@@ -36,6 +36,13 @@ func (v RealValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v RealValue) IsNULL() bool {
+	if v == RealNull() {
+		return true
+	}
+	return false
+}
+
 func (v RealValue) ToString() string {
 	return strconv.Itoa(int(v.Value))
 }

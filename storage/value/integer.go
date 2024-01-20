@@ -36,6 +36,13 @@ func (v IntegerValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v IntegerValue) IsNULL() bool {
+	if v == IntegerNull() {
+		return true
+	}
+	return false
+}
+
 func (v IntegerValue) ToString() string {
 	return strconv.Itoa(int(v.Value))
 }
