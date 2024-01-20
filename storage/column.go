@@ -18,18 +18,18 @@ type Column struct {
 	Primary       bool
 	Autoincrement bool
 	Unique        bool
-	Nullable      bool
+	NotNullable   bool
 	//Foreign Key
 	//Default
 }
 
-func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, nullable bool) Column {
+func NewColumn(name [128]byte, dataType DataType, primary bool, autoincrement bool, unique bool, notNullable bool) Column {
 	return Column{
 		Name:          name,
 		Type:          dataType,
 		Primary:       primary,
 		Autoincrement: autoincrement,
 		Unique:        unique,
-		Nullable:      nullable,
+		NotNullable:   notNullable,
 	}
 }
