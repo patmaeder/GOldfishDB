@@ -6,24 +6,26 @@ import (
 	"os"
 )
 
-type DropTableCommand struct {
+type DropTable struct {
 	Table    storage.Table
 	IfExists bool
 }
 
-func DropTable(table storage.Table, ifExists bool) DropTableCommand {
-	return DropTableCommand{
-		Table:    table,
-		IfExists: ifExists,
-	}
-}
-
-func (c DropTableCommand) Execute() error {
+func (c DropTable) Validate() any {
 	if !c.Table.Exists() {
 		if c.IfExists {
-			return nil
+			return "CODE 200: deleted"
 		}
-		return errors.New("a table with the provided name does not exists")
+		return errors.New("a table with the name " + c.Table.Name + " does not exists")
+	}
+
+	return nil
+}
+
+func (c DropTable) Execute() any {
+	err := c.Validate()
+	if err != nil {
+		return err
 	}
 
 	err1 := os.Remove(c.Table.GetFrmFilePath())
@@ -32,5 +34,5 @@ func (c DropTableCommand) Execute() error {
 		return err
 	}
 
-	return nil
+	return "CODE 200: deleted"
 }

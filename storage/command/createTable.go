@@ -2,35 +2,57 @@ package command
 
 import (
 	"DBMS/storage"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
+	"regexp"
+	"slices"
 )
 
-type CreateTableCommand struct {
+type CreateTable struct {
 	Table       storage.Table
 	IfNotExists bool
 }
 
-func CreateTable(table storage.Table, ifNotExists bool) CreateTableCommand {
-	return CreateTableCommand{
-		Table:       table,
-		IfNotExists: ifNotExists,
-	}
-}
-
-func (c CreateTableCommand) Execute() error {
-	// TODO: Move this to parser
-	/*if match, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,64}$`, c.Name); !match {
+func (c CreateTable) Validate() any {
+	if match, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,64}$`, c.Table.Name); !match {
 		return errors.New("invalid table name. Must start with a letter or an underscore and be between 1 and 64 characters long")
-	}*/
+	}
 
 	if c.Table.Exists() {
 		if c.IfNotExists {
-			return nil
+			return "CODE 201: created"
 		}
-		return errors.New("a table with the provided name already exists")
+		return errors.New("a table with the name " + c.Table.Name + " already exists")
+	}
+
+	previousColumnNames := make([][128]byte, 0)
+	for _, column := range c.Table.Columns {
+
+		if match, _ := regexp.MatchString(`^[_a-zA-Z][a-zA-Z0-9_]*$`, string(column.Name[:])); !match {
+			return errors.New("invalid column name. Must start with a letter or an underscore and be between 1 and 32 characters long")
+		}
+
+		if slices.Contains(previousColumnNames, column.Name) {
+			return errors.New("column with name " + string(column.Name[:]) + " already declared previously")
+		}
+
+		if column.Primary && !column.NotNullable {
+			return errors.New("a primary column must not be nullable")
+		}
+
+		previousColumnNames = append(previousColumnNames, column.Name)
+	}
+
+	return nil
+}
+
+func (c CreateTable) Execute() any {
+	err := c.Validate()
+	if err != nil {
+		return err
 	}
 
 	frmFile, err1 := os.Create(c.Table.GetFrmFilePath())
@@ -40,8 +62,8 @@ func (c CreateTableCommand) Execute() error {
 	}
 	defer frmFile.Close()
 
-	buffer := new(bytes.Buffer)
-	err := binary.Write(buffer, binary.LittleEndian, c.Table.RowLength)
+	buffer := bytes.NewBuffer([]byte{})
+	err = binary.Write(buffer, binary.LittleEndian, c.Table.RowLength)
 	if err != nil {
 		return err
 	}
@@ -53,10 +75,10 @@ func (c CreateTableCommand) Execute() error {
 		}
 	}
 
-	_, err = frmFile.Write(buffer.Bytes())
+	writer := bufio.NewWriter(frmFile)
+	_, err = writer.Write(buffer.Bytes())
 	if err != nil {
 		return err
 	}
-
-	return nil
+	return "CODE 201: created"
 }

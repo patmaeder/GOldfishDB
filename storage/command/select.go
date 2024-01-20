@@ -4,41 +4,66 @@ import (
 	"DBMS/storage"
 	"DBMS/storage/processors"
 	"DBMS/storage/value"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
 )
 
-type SelectCommand struct {
+type Select struct {
 	Table  storage.Table
 	Fields [][128]byte
 	Where  map[[128]byte]value.Constraint
+	Limit  int
 }
 
-func Select(table storage.Table, fields [][128]byte, where map[[128]byte]value.Constraint) SelectCommand {
-	return SelectCommand{
-		Table:  table,
-		Fields: fields,
-		Where:  where,
+func (c Select) Validate() any {
+	columns := c.Table.ConvertColumnsToMap()
+
+	for _, field := range c.Fields {
+		if _, exists := columns[field]; !exists {
+			return errors.New("column " + string(field[:]) + " does not exist on table " + c.Table.Name)
+		}
 	}
+
+	for field, constraint := range c.Where {
+		switch columns[field].Type {
+		case storage.BOOLEAN:
+			if constraint.Operator != value.EQUAL && constraint.Operator != value.NOT_EQUAL {
+				return errors.New("invalid binary operator on type BOOLEAN")
+			}
+		case storage.TEXT:
+			if constraint.Operator != value.EQUAL && constraint.Operator != value.NOT_EQUAL {
+				return errors.New("invalid binary operator on type TEXT")
+			}
+		}
+	}
+
+	if c.Limit < 0 {
+		return errors.New("limit cannot be lower than 1")
+	}
+
+	return nil
 }
 
-func (c SelectCommand) Execute() ([]storage.Row, error) {
-	// TODO: Move this to validator
-	if !c.Table.Exists() {
-		return nil, errors.New("a table with the given name does not exist")
+func (c Select) Execute() any {
+	err := c.Validate()
+	if err != nil {
+		return err
 	}
 
 	idbFile, _ := os.OpenFile(c.Table.GetIdbFilePath(), os.O_RDONLY, 0444)
+	reader := bufio.NewReader(idbFile)
 	defer idbFile.Close()
 
 	columnMap := c.Table.ConvertColumnsToMap()
-	queryResult := make([]storage.Row, 0)
+	rows := make([]storage.Row, 0)
 	where := processors.Where(&c.Table, c.Where)
+	limit := processors.Limit(c.Limit)
 
 	yield := make(chan struct{})
-	for rowId := range where.Process(yield) {
+	for rowId := range where.Limit(limit).Process(yield) {
 		row := storage.NewRow(map[[128]byte]value.Value{})
 		for _, field := range c.Fields {
 			column := columnMap[field]
@@ -61,21 +86,44 @@ func (c SelectCommand) Execute() ([]storage.Row, error) {
 			}
 
 			buffer := make([]byte, bufferSize)
-			_, err := idbFile.ReadAt(buffer, rowId*c.Table.RowLength+column.Offset)
+			idbFile.Seek(rowId*c.Table.RowLength+column.Offset, 0)
+			_, err := reader.Read(buffer)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			err = binary.Read(bytes.NewReader(buffer), binary.LittleEndian, mappingValue)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			row.Entries[column.Name] = mappingValue
 		}
 
-		queryResult = append(queryResult, row)
+		rows = append(rows, row)
 	}
 
-	return queryResult, nil
+	queryResult := ""
+
+	for i, field := range c.Fields {
+		queryResult += string(field[:])
+		if i+1 != len(c.Fields) {
+			queryResult += ";"
+		} else {
+			queryResult += "\n"
+		}
+	}
+
+	for _, row := range rows {
+		for i, field := range c.Fields {
+			queryResult += row.Entries[field].ToString()
+			if i+1 != len(c.Fields) {
+				queryResult += ";"
+			} else {
+				queryResult += "\n"
+			}
+		}
+	}
+
+	return "CODE 200: " + queryResult
 }

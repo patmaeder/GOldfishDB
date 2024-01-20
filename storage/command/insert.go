@@ -3,35 +3,60 @@ package command
 import (
 	"DBMS/storage"
 	"DBMS/storage/value"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
+	"syscall"
 )
 
-type InsertCommand struct {
+type Insert struct {
 	Table storage.Table
 	Rows  []storage.Row
 }
 
-func Insert(table storage.Table, rows []storage.Row) InsertCommand {
-	return InsertCommand{
-		Table: table,
-		Rows:  rows,
+func (c Insert) Validate() any {
+	for _, row := range c.Rows {
+		for _, column := range c.Table.Columns {
+			if column.NotNullable && !column.Autoincrement {
+				if _, exists := row.Entries[column.Name]; !exists {
+					return errors.New("column " + string(column.Name[:]) + " cannot be null")
+				}
+			}
+
+			// TODO: Check for UNIQUE constraint
+		}
 	}
+
+	return nil
 }
 
-func (c InsertCommand) Execute() error {
-	if !c.Table.Exists() {
-		return errors.New("a table with the given name does not exist")
+func (c Insert) Execute() any {
+	err := c.Validate()
+	if err != nil {
+		return err
 	}
 
 	idbFile, err := os.OpenFile(c.Table.GetIdbFilePath(), os.O_WRONLY|os.O_APPEND, os.ModeAppend)
-	defer idbFile.Close()
+	writer := bufio.NewWriter(idbFile)
+	defer func() {
+		idbFile.Close()
+		syscall.Flock(int(idbFile.Fd()), syscall.LOCK_UN)
+	}()
 
-	buffer := new(bytes.Buffer)
+	// Lock file to other goroutines
+	err = syscall.Flock(int(idbFile.Fd()), syscall.LOCK_EX)
+	if err != nil {
+		return err
+	}
+
+	buffer := bytes.NewBuffer([]byte{})
 	for _, row := range c.Rows {
 		for _, column := range c.Table.Columns {
+
+			// TODO: AUTOINCREMENT
+
 			entryValue, exists := row.Entries[column.Name]
 			if exists {
 				binary.Write(buffer, binary.LittleEndian, entryValue)
@@ -51,10 +76,10 @@ func (c InsertCommand) Execute() error {
 		}
 	}
 
-	_, err = idbFile.Write(buffer.Bytes())
+	// TODO: SEEK to EOF
+	_, err = writer.Write(buffer.Bytes())
 	if err != nil {
 		return err
 	}
-
-	return nil
+	return "CODE 201: inserted " + string(len(c.Rows)) + " records"
 }
