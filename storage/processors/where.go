@@ -12,6 +12,7 @@ type WhereProcessor struct {
 	Table          *storage.Table
 	Constraints    map[[128]byte]value.Constraint
 	limitProcessor LimitProcessor
+	reverse        bool
 }
 
 func Where(table *storage.Table, constraints map[[128]byte]value.Constraint) WhereProcessor {
@@ -23,6 +24,11 @@ func Where(table *storage.Table, constraints map[[128]byte]value.Constraint) Whe
 
 func (p WhereProcessor) Limit(limitProcessor LimitProcessor) *WhereProcessor {
 	p.limitProcessor = limitProcessor
+	return &p
+}
+
+func (p WhereProcessor) Reverse() *WhereProcessor {
+	p.reverse = true
 	return &p
 }
 
@@ -39,6 +45,10 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 		columnMap := p.Table.ConvertColumnsToMap()
 		rowCount := int64(0)
 		hits := 0
+
+		if p.reverse {
+			rowCount = idbFileStat.Size() / p.Table.RowLength
+		}
 
 		for rowCount*p.Table.RowLength < idbFileStat.Size() {
 
@@ -87,7 +97,11 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 				hits++
 			}
 
-			rowCount++
+			if p.reverse {
+				rowCount--
+			} else {
+				rowCount++
+			}
 		}
 	}()
 
