@@ -9,14 +9,15 @@ import (
 
 type Lexer struct {
 	Input   string
-	tokens  []Token.Token
+	Tokens  []Token.Token
 	pointer int
 }
 
 func New(input string) *Lexer {
-	lexer := new(Lexer)
-	lexer.Input = input
-	return lexer
+	return &Lexer{
+		Input:   strings.TrimSpace(input),
+		pointer: 0,
+	}
 }
 
 func (l *Lexer) hasNext() bool {
@@ -56,17 +57,14 @@ func (l *Lexer) peek() rune {
 }
 
 func (l *Lexer) Lex() ([]Token.Token, error) {
-	if !strings.HasSuffix(l.Input, ";") {
-		return nil, errors.New("missing semicolon at the end of the statement")
-	}
-
 	for l.hasNext() {
-		ch := l.current()
-		token, err := l.scan(ch)
+		char := l.current()
+		token, err := l.scan(char)
 		if err != nil {
 			return nil, err
 		}
-		l.tokens = append(l.tokens, token)
+
+		l.Tokens = append(l.Tokens, token)
 
 		if token.Type == Token.EOF {
 			break
@@ -75,7 +73,7 @@ func (l *Lexer) Lex() ([]Token.Token, error) {
 		l.next()
 	}
 
-	return l.tokens, nil
+	return l.Tokens, nil
 }
 
 func (l *Lexer) scan(ch rune) (Token.Token, error) {
@@ -121,10 +119,8 @@ func (l *Lexer) scanIdentifier() Token.Token {
 
 	for {
 		if isLetter(l.peek()) {
+			// TODO: Check if open parenthesis -> function
 			l.next()
-		} else if l.peek() == '(' {
-			// TODO: Parse function
-			return Token.Token{Type: Token.FUNCTION, Value: l.Input[start : l.pointer+1]}
 		} else {
 			break
 		}
@@ -134,10 +130,19 @@ func (l *Lexer) scanIdentifier() Token.Token {
 }
 
 func (l *Lexer) scanQuotedIdentifier(delimiter rune) Token.Token {
-	start := l.pointer - 1
+	start := l.pointer + 1
 	escapedChar := false
 
-	for l.peek() == delimiter || !isEOF(l.peek()) {
+	for l.hasNext() {
+		if l.peek() == delimiter {
+			l.next()
+			break
+		}
+
+		if isEOF(l.peek()) {
+			break
+		}
+
 		if escapedChar {
 			escapedChar = false
 			l.next()
@@ -153,11 +158,11 @@ func (l *Lexer) scanQuotedIdentifier(delimiter rune) Token.Token {
 		l.next()
 	}
 
-	return Token.Token{Type: Token.IDENT, Value: l.Input[start : l.pointer+1]}
+	return Token.Token{Type: Token.IDENT, Value: l.Input[start:l.pointer]}
 }
 
 func (l *Lexer) scanOperator() Token.Token {
-	start := l.pointer - 1
+	start := l.pointer
 	for isOperator(l.peek()) {
 		l.next()
 	}
@@ -184,7 +189,8 @@ func (l *Lexer) scanNumeric() {
 }
 
 func (l *Lexer) scanWildcard() Token.Token {
-	return Token.Token{Type: Token.WILDCARD, Value: "*"}
+	start := l.pointer
+	return Token.Token{Type: Token.WILDCARD, Value: l.Input[start : l.pointer+1]}
 }
 
 func (l *Lexer) scanPunctuation() Token.Token {
