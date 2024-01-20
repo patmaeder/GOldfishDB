@@ -31,7 +31,6 @@ func Start() {
 			log.Println(err.Error())
 		}
 
-		// TODO: Neat to show (multithreading)
 		go handleConnection(conn)
 	}
 }
@@ -51,9 +50,10 @@ func handleConnection(conn net.Conn) {
 	}
 
 	log.Printf("Incoming request: %s %q", conn.RemoteAddr().String(), strings.TrimSpace(string(buffer)))
+
 	res := callback(buffer)
 
-	_, err = conn.Write([]byte(res))
+	_, err = conn.Write(res)
 	if err != nil {
 		log.Println(err.Error())
 		return
