@@ -2,7 +2,6 @@ package storage
 
 import (
 	"DBMS/storage/value"
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -72,13 +71,12 @@ func GetTable(tableName string) (Table, error) {
 	}
 
 	frmFile, _ := os.OpenFile(table.GetFrmFilePath(), os.O_RDONLY, 0444)
-	reader := bufio.NewReader(frmFile)
 	defer frmFile.Close()
 	frmFileStat, _ := frmFile.Stat()
 
 	// Read RowLength
 	buffer := make([]byte, RowLengthOffset)
-	_, err := reader.Read(buffer)
+	_, err := frmFile.ReadAt(buffer, 0)
 	if err != nil {
 		return Table{}, err
 	}
@@ -95,8 +93,7 @@ func GetTable(tableName string) (Table, error) {
 
 	for columnCount*columnLength+RowLengthOffset < frmFileStat.Size() {
 		buffer := make([]byte, columnLength)
-		frmFile.Seek(columnCount*columnLength+RowLengthOffset, 0)
-		_, err := reader.Read(buffer)
+		_, err := frmFile.ReadAt(buffer, columnCount*columnLength+RowLengthOffset)
 		if err != nil {
 			return Table{}, err
 		}

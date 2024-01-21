@@ -4,10 +4,11 @@ import (
 	"DBMS/storage"
 	"DBMS/storage/processors"
 	"DBMS/storage/value"
-	"bufio"
+	"DBMS/utils"
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"syscall"
 )
@@ -25,11 +26,21 @@ func (c UpdateCommand) Validate() any {
 		column := columns[field]
 
 		if column.Autoincrement {
-			return errors.New("cannot manually set value of column " + string(column.Name[:]) + " due to AUTOINCREMENT")
+			return errors.New("cannot manually set value of column " + utils.ByteArrayToString(column.Name[:]) + " due to AUTOINCREMENT")
 		}
 
-		if column.NotNullable && value.IsNULL() {
-			return errors.New("cannot set value of NOT NULLABLE column " + string(column.Name[:]) + " to NULL")
+		if column.NotNullable && !column.Autoincrement && value.IsNULL() {
+			return errors.New("cannot set value of NOT NULLABLE column " + utils.ByteArrayToString(column.Name[:]) + " to NULL")
+		}
+
+		if column.Unique {
+			for _, col := range c.Table.Columns {
+				if col.Primary {
+					if _, exists := c.Where[col.Name]; !exists {
+						return errors.New("cannot update value of UNIQUE column " + utils.ByteArrayToString(column.Name[:]) + " without primary key as where constraint, due to multiple possible matches")
+					}
+				}
+			}
 		}
 	}
 
@@ -55,14 +66,12 @@ func (c UpdateCommand) Execute() any {
 		return err
 	}
 
-	idbFile, err := os.OpenFile(c.Table.GetIdbFilePath(), os.O_WRONLY|os.O_APPEND, os.ModeAppend)
-	writer := bufio.NewWriter(idbFile)
+	idbFile, err := os.OpenFile(c.Table.GetIdbFilePath(), os.O_WRONLY, 0644)
 	defer func() {
 		idbFile.Close()
 		syscall.Flock(int(idbFile.Fd()), syscall.LOCK_UN)
 	}()
 
-	// Lock file to other goroutines
 	err = syscall.Flock(int(idbFile.Fd()), syscall.LOCK_EX)
 	if err != nil {
 		return err
@@ -80,8 +89,7 @@ func (c UpdateCommand) Execute() any {
 			buffer := bytes.NewBuffer([]byte{})
 			binary.Write(buffer, binary.LittleEndian, fieldValue)
 
-			idbFile.Seek(rowId*c.Table.RowLength+column.Offset, 0)
-			_, err = writer.Write(buffer.Bytes())
+			_, err = idbFile.WriteAt(buffer.Bytes(), rowId*c.Table.RowLength+column.Offset)
 			if err != nil {
 				return err
 			}
@@ -90,5 +98,5 @@ func (c UpdateCommand) Execute() any {
 		rowCount++
 	}
 
-	return "CODE 200: updated " + string(rowCount) + " records"
+	return "CODE 200: updated " + fmt.Sprint(rowCount) + " record(s)"
 }

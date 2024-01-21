@@ -2,8 +2,12 @@ package value
 
 type Value interface {
 	Passes(constraint Constraint) bool
+	Equals(value Value) bool
 	IsNULL() bool
+	Smaller(value Value) bool
+	Greater(value Value) bool
 	ToString() string
+	Increment(step int) any
 }
 
 type Constraint struct {

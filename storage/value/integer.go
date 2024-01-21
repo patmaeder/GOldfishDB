@@ -36,6 +36,10 @@ func (v IntegerValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v IntegerValue) Equals(value Value) bool {
+	return v.Value == value.(IntegerValue).Value
+}
+
 func (v IntegerValue) IsNULL() bool {
 	if v == IntegerNull() {
 		return true
@@ -43,6 +47,20 @@ func (v IntegerValue) IsNULL() bool {
 	return false
 }
 
+func (v IntegerValue) Smaller(value Value) bool {
+	return v.Value < value.(*IntegerValue).Value
+}
+
+func (v IntegerValue) Greater(value Value) bool {
+	return v.Value > value.(*IntegerValue).Value
+}
+
 func (v IntegerValue) ToString() string {
+
 	return strconv.Itoa(int(v.Value))
+}
+
+func (v IntegerValue) Increment(step int) any {
+	v.Value = v.Value + int32(step)
+	return v
 }

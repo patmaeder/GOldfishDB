@@ -6,7 +6,9 @@ import (
 	"DBMS/storage/value"
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
+	"syscall"
 )
 
 type Delete struct {
@@ -39,27 +41,37 @@ func (c Delete) Execute() any {
 	}
 
 	idbFile, _ := os.OpenFile(c.Table.GetIdbFilePath(), os.O_RDWR, 0644)
-	reader := bufio.NewReader(idbFile)
-	writer := bufio.NewWriter(idbFile)
-	defer idbFile.Close()
+	idbFileStat, _ := idbFile.Stat()
+	defer func() {
+		idbFile.Close()
+		syscall.Flock(int(idbFile.Fd()), syscall.LOCK_UN)
+	}()
+
+	err = syscall.Flock(int(idbFile.Fd()), syscall.LOCK_EX)
+	if err != nil {
+		return err
+	}
 
 	where := processors.Where(&c.Table, c.Where)
 
-	rowCount := 0
+	rowCount := int64(0)
 	yield := make(chan struct{})
 	for rowId := range where.Reverse().Process(yield) {
 		_, err := idbFile.Seek((rowId+1)*c.Table.RowLength, 0)
 		if err != nil {
 			continue
 		}
-		data, _ := reader.ReadBytes('\n')
+		reader := bufio.NewReader(idbFile)
+		data, err := reader.ReadBytes('\n')
 
-		idbFile.Seek(rowId*c.Table.RowLength, 0)
-		writer.Write(data)
-
-		idbFile.Truncate(c.Table.RowLength)
+		_, err = idbFile.WriteAt(data, rowId*c.Table.RowLength)
+		if err != nil {
+			return nil
+		}
 		rowCount++
 	}
 
-	return "CODE 200: deleted " + string(rowCount) + " records"
+	idbFile.Truncate(idbFileStat.Size() - rowCount*c.Table.RowLength)
+
+	return "CODE 200: deleted " + fmt.Sprint(rowCount) + " records"
 }

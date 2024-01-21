@@ -39,18 +39,18 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 		defer close(ch)
 
 		idbFile, _ := os.OpenFile(p.Table.GetIdbFilePath(), os.O_RDONLY, 0444)
-		defer idbFile.Close()
 		idbFileStat, _ := idbFile.Stat()
+		defer idbFile.Close()
 
 		columnMap := p.Table.ConvertColumnsToMap()
-		rowCount := int64(0)
+		rowCount := idbFileStat.Size() / p.Table.RowLength
 		hits := 0
 
-		if p.reverse {
-			rowCount = idbFileStat.Size() / p.Table.RowLength
-		}
-
-		for rowCount*p.Table.RowLength < idbFileStat.Size() {
+		for i := int64(0); i < rowCount; i++ {
+			rowId := i
+			if p.reverse {
+				rowId = rowCount - (i + 1)
+			}
 
 			if p.limitProcessor.Limit > 0 && hits >= p.limitProcessor.Limit {
 				break
@@ -76,14 +76,14 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 					fieldValue = new(value.TextValue)
 				}
 
-				_, err := idbFile.ReadAt(buffer, rowCount*p.Table.RowLength+columnMap[field].Offset)
+				_, err := idbFile.ReadAt(buffer, rowId*p.Table.RowLength+columnMap[field].Offset)
 				if err != nil {
-					return
+					panic(err)
 				}
 
 				err = binary.Read(bytes.NewReader(buffer), binary.LittleEndian, fieldValue)
 				if err != nil {
-					return
+					panic(err)
 				}
 
 				if !fieldValue.Passes(constraint) {
@@ -93,14 +93,8 @@ func (p WhereProcessor) Process(resultChanel <-chan struct{}) <-chan int64 {
 			}
 
 			if rowValid {
-				ch <- rowCount
+				ch <- rowId
 				hits++
-			}
-
-			if p.reverse {
-				rowCount--
-			} else {
-				rowCount++
 			}
 		}
 	}()

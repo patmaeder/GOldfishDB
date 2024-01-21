@@ -36,6 +36,10 @@ func (v RealValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v RealValue) Equals(value Value) bool {
+	return v.Value == value.(RealValue).Value
+}
+
 func (v RealValue) IsNULL() bool {
 	if v == RealNull() {
 		return true
@@ -43,6 +47,19 @@ func (v RealValue) IsNULL() bool {
 	return false
 }
 
+func (v RealValue) Smaller(value Value) bool {
+	return v.Value < value.(*RealValue).Value
+}
+
+func (v RealValue) Greater(value Value) bool {
+	return v.Value > value.(*RealValue).Value
+}
+
 func (v RealValue) ToString() string {
 	return strconv.Itoa(int(v.Value))
+}
+
+func (v RealValue) Increment(step int) any {
+	v.Value = v.Value + int64(step)
+	return v
 }

@@ -36,6 +36,10 @@ func (v BooleanValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v BooleanValue) Equals(value Value) bool {
+	return v.Value == value.(BooleanValue).Value
+}
+
 func (v BooleanValue) IsNULL() bool {
 	if v == BooleanNull() {
 		return true
@@ -43,6 +47,18 @@ func (v BooleanValue) IsNULL() bool {
 	return false
 }
 
+func (v BooleanValue) Smaller(value Value) bool {
+	return v.Value == true && value.(*BooleanValue).Value == false
+}
+
+func (v BooleanValue) Greater(value Value) bool {
+	return v.Value == false && value.(*BooleanValue).Value == true
+}
+
 func (v BooleanValue) ToString() string {
 	return strconv.FormatBool(v.Value)
+}
+
+func (v BooleanValue) Increment(step int) any {
+	return v
 }

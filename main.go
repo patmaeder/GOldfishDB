@@ -2,6 +2,7 @@ package main
 
 import (
 	"DBMS/SQL/Parser"
+	"DBMS/TCP/Server"
 	"os"
 	"strings"
 
@@ -23,17 +24,20 @@ func main() {
 		panic(err)
 	}
 
-	/*Server.Handle(Compose)
-	Server.Start()*/
+	Server.Handle(Execute)
+	Server.Start()
 }
 
-// TODO: Rename compose function
-func Compose(buffer []byte) []byte {
+func Execute(buffer []byte) []byte {
 
 	parser := Parser.New(string(buffer))
-	_, err := parser.Parse()
+	command, err := parser.Parse()
 	if err != nil {
 		return []byte(err.Error())
 	}
-	return []byte("Received and parsed")
+	response := command.Execute()
+	if _, isError := response.(error); isError {
+		return []byte(response.(error).Error())
+	}
+	return []byte(response.(string))
 }

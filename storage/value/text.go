@@ -1,5 +1,7 @@
 package value
 
+import "DBMS/utils"
+
 const TextLength = 1024
 
 type TextValue struct {
@@ -34,6 +36,20 @@ func (v TextValue) Passes(constraint Constraint) bool {
 	return false
 }
 
+func (v TextValue) Equals(value Value) bool {
+	return v.Value == value.(TextValue).Value
+}
+
+func (v TextValue) Smaller(value Value) bool {
+	textValue := value.(*TextValue)
+	return utils.ByteArrayToString(v.Value[:]) < utils.ByteArrayToString(textValue.Value[:])
+}
+
+func (v TextValue) Greater(value Value) bool {
+	textValue := value.(*TextValue)
+	return utils.ByteArrayToString(v.Value[:]) > utils.ByteArrayToString(textValue.Value[:])
+}
+
 func (v TextValue) IsNULL() bool {
 	if v == TextNull() {
 		return true
@@ -42,5 +58,9 @@ func (v TextValue) IsNULL() bool {
 }
 
 func (v TextValue) ToString() string {
-	return "'" + string(v.Value[:]) + "'"
+	return "'" + utils.ByteArrayToString(v.Value[:]) + "'"
+}
+
+func (v TextValue) Increment(step int) any {
+	return v
 }

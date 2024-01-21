@@ -17,7 +17,7 @@ type Column struct {
 	Offset        int64
 	Primary       bool
 	Autoincrement bool
-	Unique        bool
+	Unique        bool // Not supported yet
 	NotNullable   bool
 	//Foreign Key
 	//Default

@@ -34,7 +34,6 @@ func (l *Lexer) get(shift int) (rune, error) {
 }
 
 func (l *Lexer) next() rune {
-	// TODO: Neat to show
 	defer func() {
 		l.pointer++
 	}()
@@ -119,7 +118,6 @@ func (l *Lexer) scanIdentifier() Token.Token {
 
 	for {
 		if isLetter(l.peek()) {
-			// TODO: Check if open parenthesis -> function
 			l.next()
 		} else {
 			break

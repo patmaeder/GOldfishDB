@@ -4,7 +4,7 @@ import (
 	"DBMS/storage"
 	"DBMS/storage/processors"
 	"DBMS/storage/value"
-	"bufio"
+	"DBMS/utils"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -15,6 +15,7 @@ type Select struct {
 	Table  storage.Table
 	Fields [][128]byte
 	Where  map[[128]byte]value.Constraint
+	Order  []processors.OrderInstruction
 	Limit  int
 }
 
@@ -23,7 +24,7 @@ func (c Select) Validate() any {
 
 	for _, field := range c.Fields {
 		if _, exists := columns[field]; !exists {
-			return errors.New("column " + string(field[:]) + " does not exist on table " + c.Table.Name)
+			return errors.New("column " + utils.ByteArrayToString(field[:]) + " does not exist on table " + c.Table.Name)
 		}
 	}
 
@@ -54,7 +55,6 @@ func (c Select) Execute() any {
 	}
 
 	idbFile, _ := os.OpenFile(c.Table.GetIdbFilePath(), os.O_RDONLY, 0444)
-	reader := bufio.NewReader(idbFile)
 	defer idbFile.Close()
 
 	columnMap := c.Table.ConvertColumnsToMap()
@@ -86,8 +86,7 @@ func (c Select) Execute() any {
 			}
 
 			buffer := make([]byte, bufferSize)
-			idbFile.Seek(rowId*c.Table.RowLength+column.Offset, 0)
-			_, err := reader.Read(buffer)
+			_, err := idbFile.ReadAt(buffer, rowId*c.Table.RowLength+column.Offset)
 			if err != nil {
 				return err
 			}
@@ -103,10 +102,19 @@ func (c Select) Execute() any {
 		rows = append(rows, row)
 	}
 
+	if len(rows) > 1 && len(c.Order) > 0 {
+		order := processors.Order(c.Order)
+		orderRows, err := order.Process(rows)
+		if err != nil {
+			return err
+		}
+		rows = orderRows
+	}
+
 	queryResult := ""
 
 	for i, field := range c.Fields {
-		queryResult += string(field[:])
+		queryResult += utils.ByteArrayToString(field[:])
 		if i+1 != len(c.Fields) {
 			queryResult += ";"
 		} else {

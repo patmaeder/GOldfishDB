@@ -5,6 +5,7 @@ import (
 	"DBMS/SQL/Token"
 	"DBMS/storage"
 	"DBMS/storage/command"
+	"DBMS/storage/processors"
 	"DBMS/storage/value"
 	"DBMS/utils"
 	"errors"
@@ -39,7 +40,6 @@ func (p *Parser) get(shift int) (Token.Token, error) {
 }
 
 func (p *Parser) next() (Token.Token, error) {
-	// TODO: Neat to show
 	defer func() {
 		p.pointer++
 	}()
@@ -191,8 +191,11 @@ func (p *Parser) parseSelect() error {
 			}
 			selectCommand.Limit = v
 		case "ORDER":
-			// TODO: Implement
-			return errors.New("Unsupported select modifier: " + p.current().Value)
+			order, err := p.parseOrder(table)
+			if err != nil {
+				return err
+			}
+			selectCommand.Order = order
 		default:
 			return errors.New("unknown select modifier: " + p.current().Value)
 		}
@@ -300,6 +303,11 @@ func (p *Parser) parseUpdate() error {
 		}
 		if p.peek().Value != "," {
 			break
+		}
+
+		_, err = p.next()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -466,7 +474,18 @@ func (p *Parser) parseInsert() error {
 			i++
 		}
 
+		if len(row.Entries) != len(columns) {
+			return errors.New("amount of specified columns and given values must match")
+		}
+
 		insertCommand.Rows = append(insertCommand.Rows, row)
+
+		if p.peek().Value == "," {
+			_, err = p.next()
+			if err != nil {
+				return err
+			}
+		}
 
 		_, err = p.next()
 		if err != nil {
@@ -621,10 +640,25 @@ func (p *Parser) parseCreateTable() error {
 		for p.current().Type != Token.PUNCTUATION {
 
 			switch strings.ToUpper(p.current().Value) {
+			case "PRIMARY":
+				_, err = p.next()
+				if err != nil {
+					return err
+				}
+
+				if strings.ToUpper(p.current().Value) != "KEY" {
+					return errors.New("unexpected token: " + p.current().Value)
+				}
+				column.Primary = true
+				column.Unique = true
+				column.NotNullable = true
 			case "AUTOINCREMENT":
 				column.Autoincrement = true
+				column.Unique = true
+				column.NotNullable = true
 			case "UNIQUE":
 				column.Unique = true
+				column.NotNullable = true
 			case "NOT":
 				_, err = p.next()
 				if err != nil {
@@ -634,8 +668,9 @@ func (p *Parser) parseCreateTable() error {
 				if strings.ToUpper(p.current().Value) != "NULL" {
 					return errors.New("unexpected token: " + p.current().Value)
 				}
-
 				column.NotNullable = true
+			default:
+				return errors.New("unexpected token: " + p.current().Value)
 			}
 
 			_, err = p.next()
@@ -737,6 +772,10 @@ func (p *Parser) parseWhere(table storage.Table) (map[[128]byte]value.Constraint
 			return nil, errors.New("cannot parse " + p.current().Value + " to column name with max length of 128 bytes")
 		}
 
+		if _, exists := columns[[128]byte(columnName)]; !exists {
+			return nil, errors.New("column " + utils.ByteArrayToString(columnName[:]) + " does not exist")
+		}
+
 		_, err = p.next()
 		if err != nil {
 			return nil, err
@@ -827,4 +866,57 @@ func (p *Parser) parseWhere(table storage.Table) (map[[128]byte]value.Constraint
 	}
 
 	return where, nil
+}
+
+func (p *Parser) parseOrder(table storage.Table) ([]processors.OrderInstruction, error) {
+	order := make([]processors.OrderInstruction, 0)
+	columns := table.ConvertColumnsToMap()
+
+	_, err := p.next()
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.ToUpper(p.current().Value) != "BY" {
+		return nil, errors.New("unexpected token: " + p.current().Value)
+	}
+
+	for {
+		instruction := processors.OrderInstruction{Direction: processors.ASC}
+		_, err := p.next()
+		if err != nil {
+			return nil, err
+		}
+
+		columnName, err := utils.StringToByteArray(p.current().Value, 128)
+		if err != nil {
+			return nil, errors.New("cannot parse " + p.current().Value + " to column name with max length of 128 bytes")
+		}
+
+		if _, exists := columns[[128]byte(columnName)]; !exists {
+			return nil, errors.New("column " + utils.ByteArrayToString(columnName[:]) + " does not exist")
+		}
+		instruction.Column = [128]byte(columnName)
+
+		if strings.ToUpper(p.peek().Value) == "ASC" || strings.ToUpper(p.peek().Value) == "DESC" {
+			_, err = p.next()
+			if err != nil {
+				return nil, err
+			}
+
+			if strings.ToUpper(p.current().Value) == "DESC" {
+				instruction.Direction = processors.DESC
+			}
+		}
+
+		order = append(order, instruction)
+
+		if p.peek().Type == Token.PUNCTUATION {
+			continue
+		}
+
+		break
+	}
+
+	return order, nil
 }

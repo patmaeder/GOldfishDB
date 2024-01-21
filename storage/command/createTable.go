@@ -2,6 +2,7 @@ package command
 
 import (
 	"DBMS/storage"
+	"DBMS/utils"
 	"bufio"
 	"bytes"
 	"encoding/binary"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"syscall"
 )
 
 type CreateTable struct {
@@ -17,7 +19,7 @@ type CreateTable struct {
 }
 
 func (c CreateTable) Validate() any {
-	if match, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,64}$`, c.Table.Name); !match {
+	if matched, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,63}$`, c.Table.Name); !matched {
 		return errors.New("invalid table name. Must start with a letter or an underscore and be between 1 and 64 characters long")
 	}
 
@@ -30,17 +32,16 @@ func (c CreateTable) Validate() any {
 
 	previousColumnNames := make([][128]byte, 0)
 	for _, column := range c.Table.Columns {
-
-		if match, _ := regexp.MatchString(`^[_a-zA-Z][a-zA-Z0-9_]*$`, string(column.Name[:])); !match {
+		if matched, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_\-]{1,31}$`, utils.ByteArrayToString(column.Name[:])); !matched {
 			return errors.New("invalid column name. Must start with a letter or an underscore and be between 1 and 32 characters long")
 		}
 
 		if slices.Contains(previousColumnNames, column.Name) {
-			return errors.New("column with name " + string(column.Name[:]) + " already declared previously")
+			return errors.New("column with name " + utils.ByteArrayToString(column.Name[:]) + " already declared previously")
 		}
 
-		if column.Primary && !column.NotNullable {
-			return errors.New("a primary column must not be nullable")
+		if column.Autoincrement && !(column.Type == storage.INTEGER || column.Type == storage.REAL) {
+			return errors.New("only columns of type INTEGER or REAL can be AUTOINCREMENT")
 		}
 
 		previousColumnNames = append(previousColumnNames, column.Name)
@@ -60,7 +61,16 @@ func (c CreateTable) Execute() any {
 	if err := errors.Join(err1, err2); err != nil {
 		return err
 	}
-	defer frmFile.Close()
+	defer func() {
+		frmFile.Close()
+		frmFile.Sync()
+		syscall.Flock(int(frmFile.Fd()), syscall.LOCK_UN)
+	}()
+
+	err = syscall.Flock(int(frmFile.Fd()), syscall.LOCK_EX)
+	if err != nil {
+		return err
+	}
 
 	buffer := bytes.NewBuffer([]byte{})
 	err = binary.Write(buffer, binary.LittleEndian, c.Table.RowLength)
@@ -77,6 +87,7 @@ func (c CreateTable) Execute() any {
 
 	writer := bufio.NewWriter(frmFile)
 	_, err = writer.Write(buffer.Bytes())
+	writer.Flush()
 	if err != nil {
 		return err
 	}

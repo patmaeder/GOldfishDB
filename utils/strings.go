@@ -1,6 +1,10 @@
 package utils
 
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"strings"
+)
 
 func StringToByteArray(string string, length int) ([]byte, error) {
 	stringBytes := []byte(string)
@@ -10,4 +14,10 @@ func StringToByteArray(string string, length int) ([]byte, error) {
 	buffer := make([]byte, length-len(stringBytes))
 
 	return append(stringBytes, buffer...), nil
+}
+
+func ByteArrayToString(byteArray []byte) string {
+	buffer := bytes.NewBuffer(byteArray)
+	trimmedString := strings.TrimRight(buffer.String(), string(0))
+	return trimmedString
 }
